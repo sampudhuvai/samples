@@ -49,9 +49,9 @@ composite Main
 
 		}
 
-		() as MapViewer_2 = MapViewer(RedEntities_out0, GreenEntities_out0)
-		{
-		}
+//		() as MapViewer_2 = MapViewer(GreenEntities_out0, RedEntities_out0)
+//		{
+//		}
 
 		(stream<rstring id, rstring wkt,uint32 updateAction, rstring note,
 			MARKER_TYPE markerType> GreenEntities_out0) as GreenEntities = Custom()

@@ -8,7 +8,7 @@ use com.ibm.streamsx.inet.rest::HTTPTupleView ;
 /** Marker type supported by etc/map.html
  * Entities will be displayed in markers in color as specified by the MARKER_TYPE
  */
-type MARKER_TYPE = enum { GREEN, YELLOW, RED } ;
+type MARKER_TYPE = enum { GREEN, YELLOW, RED, BLUE } ;
 
 
 /** The expected schema for the MapViewer composite
@@ -19,7 +19,7 @@ type MARKER_TYPE = enum { GREEN, YELLOW, RED } ;
  * markerType - if the entity is a point, the color of the marker to use.
  */
 type MapViewerT = rstring id, rstring wkt, uint32 updateAction, rstring note,
-	MARKER_TYPE markerType ;
+	MARKER_TYPE markerType, rstring layerType ;
 
 /** Composite to allow easy visualization of geospatial data on a map.
  * This composite wrappers a HTTPTupleView operator from the com.ibm.streamsx.inet toolkit.

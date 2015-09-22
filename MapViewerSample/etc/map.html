@@ -28,6 +28,9 @@ html,body,#map-canvas {
 		// map to keep track of markers in the map
 		var markerMap = {};
 		
+		// map to keep track of all posts
+		var markerAllPosts = {};
+		
 		// map to keep track of popup in the map
 		var popupMap = {};
 		
@@ -88,12 +91,28 @@ html,body,#map-canvas {
 			map = new OpenLayers.Map('map-canvas', map_options);
 			map.addLayer(new OpenLayers.Layer.OSM());
 
-			// create marker layer
-			markers = new OpenLayers.Layer.Markers("Markers");
-			map.addLayer(markers);				
 			
-			// create polygon layer
-			vectors = new OpenLayers.Layer.Vector("Polygon", {
+			// create allPosts Layer
+         allPostsMarkers = new OpenLayers.Layer.Markers("All Posts");
+         map.addLayer(allPostsMarkers);
+         
+         // create Patient Layer
+         allPatientMarkers = new OpenLayers.Layer.Markers("Patient Posts");
+         map.addLayer(allPatientMarkers);
+
+         // create same location Layer
+         allSameLocationMarkers = new OpenLayers.Layer.Markers("Same Location Posts");
+         map.addLayer(allSameLocationMarkers);
+
+         // create possible infection cases layer
+         allAtRiskMarkers = new OpenLayers.Layer.Markers("At Risk");
+         map.addLayer(allAtRiskMarkers);
+
+         
+				
+			
+//			 create polygon layer
+			vectors = new OpenLayers.Layer.Vector("Area of Effect", {
 			    styleMap: new OpenLayers.StyleMap({
 			        "default": new OpenLayers.Style({
 			            fillColor: "#33CC00",
@@ -102,6 +121,7 @@ html,body,#map-canvas {
 			        })
 			    })
 			});
+			
 			map.addLayer(vectors);
 			
 			// retrieve data from HTTPTupleView
@@ -166,7 +186,9 @@ html,body,#map-canvas {
 			if (markerType=='YELLOW')
 				return 'marker-gold.png';
 			if (markerType=='RED')
-				return 'marker-red.png';				
+				return 'marker-red.png';
+			if(markerType == 'BLUE')
+			   return 'marker-blue.gif';					
 		}
 		
 		function updateMap(response) {
@@ -174,17 +196,19 @@ html,body,#map-canvas {
 			try {
 				// HTTPTupleView retuns tuples information as JSON, parse the JSON into a list of objects to process
 				var allObjects = JSON.parse(response);
-						
-				// for each object, update marker or poly accordingly.						
+				
+				var markerUniqueID = 0;					
 				for (var i=0; i<allObjects.length; i++) {
 					var markerID = allObjects[i].id;
 					var wkt = allObjects[i].wkt;
 					var markerType = allObjects[i].markerType;
 					var updateAction = allObjects[i].updateAction;
+					var layerType = allObjects[i].layerType;
 					
 					// construct WKT formatter to parse out geometry from tuples
 					var formatter = new OpenLayers.Format.WKT();
 			
+			   
 					// parse wkt string from tuples
 					var feature = formatter.read(wkt);
 					
@@ -192,7 +216,7 @@ html,body,#map-canvas {
 					var transformedFeature = feature.geometry.transform(new OpenLayers.Projection("EPSG:4326"), map.getProjectionObject());
 					
 					var vertices = transformedFeature.getVertices();
-					
+               					
 					// this is a point, number of vertices must be 1
 					if (vertices.length == 1) {
 					
@@ -201,13 +225,6 @@ html,body,#map-canvas {
 						// create longlat object for marker
 						var myLongLat = new OpenLayers.LonLat(transformedFeature.x, transformedFeature.y);				
 			
-						var marker;
-						
-						// check if marker exists, if so remove
-						if (markerID in markerMap) {
-							marker = markerMap[markerID];
-							markers.removeMarker(marker);
-						}
 
 						// if updateAction > 1, that means we need to add marker back
 						// otherwise simply remove marker
@@ -216,11 +233,35 @@ html,body,#map-canvas {
 							var icon = new OpenLayers.Icon(getIcon(markerType));
 	
 							var marker = new OpenLayers.Marker(myLongLat, icon.clone());
-							markers.addMarker(marker);
+							
+							
+							if(layerType == 'allPosts')
+							{
+							 allPostsMarkers.addMarker(marker);
+							}
+							else if(layerType == 'patientPosts')
+							{
+							 allPatientMarkers.addMarker(marker);
+                      var center_point = new OpenLayers.Geometry.Point(transformedFeature.x, transformedFeature.y);
+                      var poly = new OpenLayers.Geometry.Polygon.createRegularPolygon(center_point, 5.0*3, 36, 360);
+                      var style = {strokeColor: "#FF0000",strokeOpacity: 1,strokeWidth: 2,fillColor: "#FF0000",fillOpacity: 0.0};
+                      var polygonFeature = new OpenLayers.Feature.Vector(poly, null, style);                 
+                      vectors.addFeatures([polygonFeature]);
+                      polygonMap[markerID+layerType]=polygonFeature;
+							 
+							}
+							else if(layerType =='sameLocationPosts')
+							{
+							  allSameLocationMarkers.addMarker(marker);
+							}
+							else if(layerType == 'atRiskPosts')
+							{
+							  allAtRiskMarkers.addMarker(marker);
+							}
 	
 							// save marker to maperMap so we can get it back in the next update
-							markerMap[markerID] = marker;		
-						
+							markerMap[markerID] = marker;
+							
 							// if this is the first point, center the map to the point.
 							if (center == null)
 							{
@@ -230,25 +271,6 @@ html,body,#map-canvas {
 						
 							// add popup for marker
 							addPopup(allObjects[i], myLongLat);
-						}
-					}
-					// else assume it's a polygon
-					else {
-						
-						// remove existing polygon from map if one with same markerId exist
-						if (markerID in polygonMap) {
-							var featureToRemove = polygonMap[markerID];
-							vectors.removeFeatures([featureToRemove]);
-						}
-					
-						// add new polygon back to the map
-						if (updateAction > 0)
-						{
-							var poly = new OpenLayers.Geometry.LinearRing(vertices);
-							var style = {strokeColor: "#ff3300",strokeOpacity: 1,strokeWidth: 2,fillColor: "#FF9966",fillOpacity: 0.1};
-							var polygonFeature = new OpenLayers.Feature.Vector(poly, null, style);						
-							vectors.addFeatures([polygonFeature]);
-							polygonMap[markerID]=polygonFeature;
 						}
 					}
 					
